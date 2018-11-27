@@ -1,0 +1,10 @@
+.wc_litego_payment .wc_litego_payrequest {
+	font-size: 12px;
+}
+
+.wc_litego_walletslist {
+	margin-top: 5px;
+	font-weight: normal;
+	font-size: 1em;
+	text-transform: none;
+}
