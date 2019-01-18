@@ -3,11 +3,11 @@
  * Plugin Name: LiteGo.io plugin for Woocommerce
  * Plugin URI: https://github.com/litegoio/litego-plugin-for-woocommerce
  * Description: A gateway to pay with the Bitcoin Lightning Network through the Litego API.
- * Version: 1.0.0
- * Author: LiteGo.io
+ * Version: 1.1.0
+ * Author: Anastasiia Sierykh (LiteGo.io)
  * Author URI: https://litego.io
  * Requires at least: 4.7
- * Tested up to: 4.7
+ * Tested up to: 5.0.3
  * License: Apache-2.0
  */
 

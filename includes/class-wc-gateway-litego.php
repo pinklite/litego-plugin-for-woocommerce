@@ -160,7 +160,7 @@ class WC_Litego_Gateway extends WC_Payment_Gateway {
 	 */
 	public function is_available() {
 		if ('yes' === $this->enabled) {
-			if (!is_ssl() || get_woocommerce_currency() !== 'BTC') {
+			if (get_woocommerce_currency() !== 'BTC') {
 				return false;
 			}
 			if ($this->is_mainnet_on()) {
@@ -187,6 +187,32 @@ class WC_Litego_Gateway extends WC_Payment_Gateway {
 	public function init_form_fields() {
 		$this->form_fields = require( dirname( __FILE__ ) . '/admin/litego-settings.php' );
 	}
+
+    /**
+     * Reset auth_token/refresh_token if we change smth in the backend settings
+     *
+     * @return mixed
+     */
+	public function process_admin_options() {
+        $this->init_settings();
+
+        $this->settings['auth_token'] = "";
+        $this->settings['refresh_token'] = "";
+
+        $post_data = $this->get_post_data();
+
+        foreach ( $this->get_form_fields() as $key => $field ) {
+            if ( 'title' !== $this->get_field_type( $field ) ) {
+                try {
+                    $this->settings[ $key ] = $this->get_field_value( $key, $field, $post_data );
+                } catch ( Exception $e ) {
+                    $this->add_error( $e->getMessage() );
+                }
+            }
+        }
+
+        return update_option( $this->get_option_key(), apply_filters( 'woocommerce_settings_api_sanitized_fields_' . $this->id, $this->settings ), 'yes' );
+    }
 
 	/**
 	 * Process the payment
@@ -329,8 +355,6 @@ class WC_Litego_Gateway extends WC_Payment_Gateway {
 		exit();
 	}
 
-
-
 	/**
      * Send a charge creation request to Litego
      *
@@ -346,9 +370,8 @@ class WC_Litego_Gateway extends WC_Payment_Gateway {
                 $body['amount']
             );
 
-
         //reauthenticate first
-        if($result['error'] and $result['error_message']=="Forbidden") {
+        if($result['error'] and $result['error_name'] == "Forbidden") {
             $auth = $this->litegoApi->reauthenticate($this->refresh_token, $this->merchant_id, $this->secret_key);
             $this->updateTokens($auth);
 
@@ -362,22 +385,23 @@ class WC_Litego_Gateway extends WC_Payment_Gateway {
 
         if($result['error'])
         {
-            $this->log("Error Response: " . print_r( $result['error_message'], true));
-            return new WP_Error('litego_error', __('There was a problem connecting to the payment gateway.', 'woo-litego'));
+            $this->log("Error Response: " . print_r( $result['error_name'] .": ". $result['error_message'], true));
+            if ($result['error_name'] == "SendCoinsError") {
+                return new WP_Error('litego_error', __('Payment is too large, max payment allowed is 0.04294967 BTC', 'woo-litego'));
+            } else {
+                return new WP_Error('litego_error', __('There was a problem connecting to the payment gateway.', 'woo-litego'));
+            }
 
         }
 
-
-        if (empty( $result['payment_request'])) {
-            return new WP_Error('litego_error', __('There was a problem connecting to the payment gateway.', 'woo-litego'));
-        } else {
-            return $result;
-        }
+        return $result;
     }
 
     private function updateTokens($authData) {
-        update_post_meta('woocommerce_litego_auth_token', $authData['auth_token']);
-        update_post_meta('woocommerce_litego_refresh_token', $authData['refresh_token']);
+        $options = get_option('woocommerce_litego_settings');
+        $options['auth_token'] = $authData['auth_token'];
+        $options['refresh_token'] = $authData['refresh_token'];
+        update_option('woocommerce_litego_settings', $options);
         $this->auth_token = $authData['auth_token'];
         $this->refresh_token = $authData['refresh_token'];
     }
@@ -398,7 +422,7 @@ class WC_Litego_Gateway extends WC_Payment_Gateway {
         );
 
         //reauthenticate first
-        if($result['error'] and $result['error_message']=="Forbidden") {
+        if($result['error'] and $result['error_name'] == "Forbidden") {
             $auth = $this->litegoApi->reauthenticate($this->refresh_token, $this->merchant_id, $this->secret_key);
             $this->updateTokens($auth);
 
@@ -411,17 +435,11 @@ class WC_Litego_Gateway extends WC_Payment_Gateway {
 
         if($result['error'])
         {
-            $this->log("Error Response: " . print_r( $result['error_message'], true));
+            $this->log("Error Response: " . print_r( $result['error_name'] .": ". $result['error_message'], true));
             return new WP_Error('litego_error', __('There was a problem connecting to the payment gateway.', 'woo-litego'));
-
         }
 
-
-        if ( empty($result['payment_request']) ) {
-            return new WP_Error('litego_error', __('There was a problem connecting to the payment gateway.', 'woo-litego'));
-        } else {
-            return $result;
-        }
+        return $result;
 	}
 	
 	private function log($message) {
