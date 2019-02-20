@@ -320,7 +320,7 @@ class WC_Litego_Gateway extends WC_Payment_Gateway {
 				if ($order !== false) {
 					if ($order->has_status('pending')) {
 						$verification = $this->get_charge($charge_id);
-						if ($verification['paid']) {
+						if ($verification['paid'] && intval($verification['amount_paid_satoshi']) >= $this->get_amount_satoshi($order->get_total())) {
 							$order->payment_complete();
 							$this->log(sprintf(__('order has been completed, paid by charge %s.', 'woo-litego'), $charge_id));
 						} else {
